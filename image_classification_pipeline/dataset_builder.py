@@ -3,6 +3,7 @@ import glob
 import os
 import random
 from pathlib import Path
+from typing import Union
 
 import cv2
 import pandas as pd
@@ -12,6 +13,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
 from tensorflow.python.data import AUTOTUNE
 from tqdm import tqdm
+
 
 # %% Class
 
@@ -36,7 +38,6 @@ class Dataset(object):
         requested to be collected
         :param batch_size: Batch size for tf.data
 
-
         >>> d = Dataset(
         ...     data_directories=[
         ...         ["./data/train/real/1", -1],
@@ -51,6 +52,7 @@ class Dataset(object):
         ...     image_extensions=["/*.jpeg", "/*.jpg", "/*.png"]
         ... )
         """
+
         super(Dataset, self).__init__()
         self.data_directories = data_directories
         self.labels = labels
@@ -75,7 +77,11 @@ class Dataset(object):
             progress_bar.update()
         return all_data
 
-    def display_image_grid(self, images_filepaths, image_size, predicted_labels=None, cols=5):
+    def display_image_grid(self,
+                           images_filepaths: list[str],
+                           image_size: list[int] = (240, 240),
+                           predicted_labels: list[str] = None,
+                           cols: int = 5):
         """
         :param images_filepaths: File paths of the images that wants be visualized.
         :param predicted_labels: Predicted labels of the given images (optional).
@@ -104,18 +110,22 @@ class Dataset(object):
         plt.tight_layout()
         plt.show()
 
-    def __load_images(self, image_path, image_label, categorical=False):
-        breakpoint()
+    def __load_images(self,
+                      image_path: tf.Tensor,
+                      image_label: tf.Tensor,
+                      categorical: bool = False):
 
         image = tf.io.read_file(image_path)
-        image = tf.image.decode_png(image, channels=3)
+        image = tf.image.decode_png(image, channels=self.channels)
         image = tf.image.resize(image, self.image_size) / 255.0
         if categorical:
             image_label = tf.one_hot(tf.strings.to_number(image_label, out_type=tf.dtypes.int32), len(self.labels))
         return image, image_label
 
     @tf.function
-    def __augment_images(self, images, labels):
+    def __augment_images(self,
+                         images: tf.Tensor,
+                         labels: tf.Tensor):
         images = tf.image.random_flip_left_right(images)
         images = tf.image.rot90(images)
         images = tf.image.random_flip_up_down(images)
@@ -123,11 +133,13 @@ class Dataset(object):
 
     def get_dataset(
             self,
-            split_ratios=(0.7, 0.2, 0.1),
-            cache="./",
-            balanced_weights=False,
-            categorical=True,
-            show_details=True):
+            split_ratios: Union[
+                tuple[float, float, float],
+                tuple[float, float]] = (0.7, 0.2, 0.1),
+            cache: str = "./",
+            balanced_weights: bool = False,
+            categorical: bool = True,
+            show_details: bool = True):
         """
         :param split_ratios: (train, validation, test) ratios.
         :param cache: Path that is cached values will be placed.
